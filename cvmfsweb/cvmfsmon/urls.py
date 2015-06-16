@@ -2,7 +2,7 @@ from django.conf.urls import patterns, include, url
 
 from cvmfsmon     import views
 from tastypie.api import Api
-from cvmfsmon.api import Stratum0Resource, Stratum1Resource, RepositoryResource
+from cvmfsmon.api import *
 
 v1_api = Api(api_name='v1.0')
 v1_api.register(Stratum0Resource())
