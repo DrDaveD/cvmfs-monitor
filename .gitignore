@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 
+# Django configuration
+cvmfsweb/cvmfsweb/settings.py
+
 # C extensions
 *.so
 
@@ -55,3 +58,6 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# OS X Finder Junk
+**.DS_Store
