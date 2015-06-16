@@ -129,11 +129,10 @@ INSTALLED_APPS = (
     # 'django.contrib.admindocs',
 
     'tastypie', # REST API framework
+    'south',    # database migration system
 
     'cvmfsmon',
 
-    # migration system
-    # 'south'
 )
 
 # A sample logging configuration. The only tangible logging
