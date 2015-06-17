@@ -4,8 +4,11 @@ import cvmfs
 import urlparse
 
 class Stratum:
+    def make_endpoint(self, fqrn):
+        return '/'.join([ self.get_base_url(), fqrn ])
+
     def connect_to(self, fqrn):
-        return cvmfs.open_repository(self.get_base_url() + "/" + fqrn)
+        return cvmfs.open_repository(self.make_endpoint(fqrn))
 
     def is_stratum0(self):
         return False

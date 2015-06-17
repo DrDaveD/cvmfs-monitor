@@ -45,6 +45,56 @@ class RepositoryResource(ModelResource):
         ]
 
 
+class Endpoint(object):
+    def __init__(self, stratum=None, fqrn=None):
+        self.endpoint = ""
+        if stratum and fqrn:
+            self.fqrn     = fqrn
+            self._stratum = stratum
+            self.endpoint = stratum.make_endpoint(fqrn)
+
+    def make_endpoint_id(self):
+        stratum0 = self._stratum.is_stratum0()
+        kwargs = {}
+        kwargs['stratum_type']  = 'stratum0' if stratum0 else 'stratum1'
+        kwargs['stratum_alias'] = self._stratum.alias
+        kwargs['fqrn']          = self.fqrn
+        return kwargs
+
+
+class EndpointResource(Resource):
+    fqrn     = fields.CharField(attribute='fqrn')
+    endpoint = fields.CharField(attribute='endpoint')
+
+    class Meta:
+        resource_name   = 'endpoint'
+        detail_uri_name = 'endpoint_def'
+        object_class    = Endpoint
+        allowed_methods = [ 'get' ]
+
+    def prepend_urls(self):
+        return [
+            url(r"^(?P<resource_name>%s)/(?P<stratum_type>[\w\d_.-]+)/(?P<fqrn>[\w\d_.-]+)/(?P<stratum_alias>[\w\d_.-]+)/$" % self._meta.resource_name, self.wrap_view('dispatch_detail'), name="api_dispatch_detail"),
+        ]
+
+    def detail_uri_kwargs(self, bundle_or_obj):
+        is_bundle = isinstance(bundle_or_obj, Bundle)
+        obj = bundle_or_obj.obj if is_bundle else bundle_or_obj
+        return obj.make_endpoint_id()
+
+    def obj_get(self, bundle, **kwargs):
+        stratum_class = Stratum0 if   kwargs['stratum_type'] == 'stratum0' \
+                                 else Stratum1
+        stratum = stratum_class.objects.get(alias=kwargs['stratum_alias'])
+        return Endpoint(stratum=stratum, fqrn=kwargs['fqrn'])
+
+    def obj_get_list(self, bundle, **kwargs):
+        raise ImmediateHttpResponse(response=http.HttpBadRequest())
+
+    def rollback(self, bundles):
+        pass
+
+
 class EndpointStatus(object):
     def __init__(self, stratum=None, fqrn=None):
         if stratum and fqrn:
@@ -76,7 +126,7 @@ class EndpointStatusResource(Resource):
     endpoint         = fields.CharField(attribute='endpoint')
 
     class Meta:
-        resource_name   = 'endpoint'
+        resource_name   = 'endpoint_status'
         detail_uri_name = 'endpoint_definition'
         object_class    = EndpointStatus
         allowed_methods = [ 'get' ]
