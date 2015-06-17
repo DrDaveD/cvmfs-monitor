@@ -24,7 +24,7 @@ class Stratum1Resource(ModelResource):
 
 
 class RepositoryResource(ModelResource):
-    endpoints = fields.ManyToManyField('cvmfsmon.api.EndpointStatusResource', 'endpoints', null=True, full=False)
+    endpoints = fields.ManyToManyField('cvmfsmon.api.EndpointResource', 'endpoints', null=True, full=True)
 
     class Meta:
         resource_name   = 'repository'
@@ -34,8 +34,8 @@ class RepositoryResource(ModelResource):
         excludes        = [ 'id' ]
 
     def dehydrate_endpoints(self, bundle):
-        esr = EndpointStatusResource()
-        bundles = [ esr.build_bundle(obj=EndpointStatus(s1, bundle.obj.fqrn), request=bundle.request) for s1 in bundle.obj.stratum1s.all() ]
+        esr = EndpointResource()
+        bundles = [ esr.build_bundle(obj=Endpoint(s1, bundle.obj.fqrn), request=bundle.request) for s1 in bundle.obj.stratum1s.all() ]
         # bundles = []
         return [ esr.full_dehydrate(bundle) for bundle in bundles ]
 
