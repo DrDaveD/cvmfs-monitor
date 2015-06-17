@@ -18,6 +18,7 @@ class Stratum1Resource(ModelResource):
         detail_uri_name = 'alias'
         queryset        = Stratum1.objects.all()
         allowed_methods = [ 'get' ]
+        excludes        = [ 'id' ]
 
     def prepend_urls(self):
         return [
@@ -34,6 +35,7 @@ class RepositoryResource(ModelResource):
         detail_uri_name = 'fqrn'
         queryset        = Repository.objects.all()
         allowed_methods = [ 'get' ]
+        excludes        = [ 'id' ]
 
     def prepend_urls(self):
         return [
