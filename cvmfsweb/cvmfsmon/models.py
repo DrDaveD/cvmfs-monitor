@@ -5,8 +5,7 @@ import urlparse
 
 class Stratum:
     def connect_to(self, fqrn):
-        endpoint = urlparse.urljoin(self.get_base_url(), fqrn)
-        return cvmfs.open_repository(endpoint)
+        return cvmfs.open_repository(self.get_base_url() + "/" + fqrn)
 
     def is_stratum0(self):
         return False
@@ -23,7 +22,7 @@ class Stratum0(models.Model, Stratum):
         return self.name
 
     def get_base_url(self):
-        return self.url
+        return urlparse.urlunparse(urlparse.urlparse(self.url))
 
     def is_stratum0(self):
         return True
@@ -38,7 +37,7 @@ class Stratum1(models.Model, Stratum):
         return self.name
 
     def get_base_url(self):
-        return self.url
+        return urlparse.urlunparse(urlparse.urlparse(self.url))
 
     def is_stratum1(self):
         return True

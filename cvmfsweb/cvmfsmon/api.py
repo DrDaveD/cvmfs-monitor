@@ -24,7 +24,7 @@ class Stratum1Resource(ModelResource):
 
 
 class RepositoryResource(ModelResource):
-    stratum1s = fields.ManyToManyField(Stratum1Resource, 'stratum1s', null=True)
+    endpoints = fields.ManyToManyField('cvmfsmon.api.EndpointStatusResource', 'endpoints', null=True, full=False)
 
     class Meta:
         resource_name   = 'repository'
@@ -32,6 +32,12 @@ class RepositoryResource(ModelResource):
         queryset        = Repository.objects.all()
         allowed_methods = [ 'get' ]
         excludes        = [ 'id' ]
+
+    def dehydrate_endpoints(self, bundle):
+        esr = EndpointStatusResource()
+        bundles = [ esr.build_bundle(obj=EndpointStatus(s1, bundle.obj.fqrn), request=bundle.request) for s1 in bundle.obj.stratum1s.all() ]
+        # bundles = []
+        return [ esr.full_dehydrate(bundle) for bundle in bundles ]
 
     def prepend_urls(self):
         return [
@@ -73,6 +79,7 @@ class EndpointStatusResource(Resource):
         resource_name   = 'endpoint'
         detail_uri_name = 'endpoint_definition'
         object_class    = EndpointStatus
+        allowed_methods = [ 'get' ]
 
     def prepend_urls(self):
         return [
