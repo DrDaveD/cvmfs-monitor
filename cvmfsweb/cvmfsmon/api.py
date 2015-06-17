@@ -11,6 +11,8 @@ class Stratum0Resource(ModelResource):
 
 
 class Stratum1Resource(ModelResource):
+    repositories = fields.ManyToManyField('cvmfsmon.api.RepositoryResource', 'repository_set', null=True)
+
     class Meta:
         resource_name   = 'stratum1'
         detail_uri_name = 'alias'
@@ -25,7 +27,7 @@ class Stratum1Resource(ModelResource):
 
 class RepositoryResource(ModelResource):
     stratum0  = fields.ForeignKey(Stratum0Resource, 'stratum0')
-    stratum1s = fields.ManyToManyField(Stratum1Resource, 'stratum1s')
+    stratum1s = fields.ManyToManyField(Stratum1Resource, 'stratum1s', null=True)
 
     class Meta:
         resource_name   = 'repository'
