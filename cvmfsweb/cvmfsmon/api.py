@@ -3,12 +3,6 @@ from tastypie.resources import ModelResource
 from tastypie           import fields
 from cvmfsmon.models    import Stratum0, Stratum1, Repository
 
-class Stratum0Resource(ModelResource):
-    class Meta:
-        resource_name   = 'stratum0'
-        queryset        = Stratum0.objects.all()
-        allowed_methods = [ 'get' ]
-
 
 class Stratum1Resource(ModelResource):
     repositories = fields.ManyToManyField('cvmfsmon.api.RepositoryResource', 'repository_set', null=True)
@@ -27,7 +21,6 @@ class Stratum1Resource(ModelResource):
 
 
 class RepositoryResource(ModelResource):
-    stratum0  = fields.ForeignKey(Stratum0Resource, 'stratum0')
     stratum1s = fields.ManyToManyField(Stratum1Resource, 'stratum1s', null=True)
 
     class Meta:

@@ -5,7 +5,6 @@ from tastypie.api import Api
 from cvmfsmon.api import *
 
 v1_api = Api(api_name='v1.0')
-v1_api.register(Stratum0Resource())
 v1_api.register(Stratum1Resource())
 v1_api.register(RepositoryResource())
 
