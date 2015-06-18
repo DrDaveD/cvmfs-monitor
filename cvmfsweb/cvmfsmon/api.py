@@ -35,9 +35,14 @@ class RepositoryResource(ModelResource):
 
     def dehydrate_endpoints(self, bundle):
         esr = EndpointResource()
-        bundles = [ esr.build_bundle(obj=Endpoint(s1, bundle.obj.fqrn), request=bundle.request) for s1 in bundle.obj.stratum1s.all() ]
-        # bundles = []
-        return [ esr.full_dehydrate(bundle) for bundle in bundles ]
+        bundles = []
+        for s1 in bundle.obj.stratum1s.all():
+            endpoint = Endpoint(s1, bundle.obj.fqrn)
+            bundle = esr.build_bundle(obj=endpoint)
+            bundle = esr.full_dehydrate(bundle)
+            del bundle.data['fqrn'] # remove redundant fqrn field here
+            bundles.append(bundle)
+        return bundles
 
     def prepend_urls(self):
         return [
