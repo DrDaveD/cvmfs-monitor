@@ -34,6 +34,8 @@ class RepositoryResource(ModelResource):
         excludes        = [ 'id' ]
 
     def dehydrate_endpoints(self, bundle):
+        # TODO: not sure if that is the preferred way to connect this to the
+        #       EndpointResournce
         esr = EndpointResource()
         bundles = []
         for s1 in bundle.obj.stratum1s.all():
