@@ -3,17 +3,17 @@ from tastypie.resources  import Resource, ModelResource
 from tastypie            import fields, http
 from tastypie.bundle     import Bundle
 from tastypie.exceptions import ImmediateHttpResponse
-from cvmfsmon.models     import Stratum0, Stratum1, Repository
+from cvmfsmon.models     import Stratum, Repository
 from tastypie.utils      import trailing_slash
 
 
 class Stratum1Resource(ModelResource):
-    repositories = fields.ManyToManyField('cvmfsmon.api.RepositoryResource', 'repository_set', null=True)
+    repositories = fields.ManyToManyField('cvmfsmon.api.RepositoryResource', 'stratum1s', null=True)
 
     class Meta:
         resource_name   = 'stratum1'
         detail_uri_name = 'alias'
-        queryset        = Stratum1.objects.all()
+        queryset        = Stratum.objects.filter(level=1)
         allowed_methods = [ 'get' ]
         excludes        = [ 'id' ]
 
@@ -61,12 +61,9 @@ class Endpoint(object):
             self.endpoint = stratum.make_endpoint(fqrn)
 
     def make_endpoint_id(self):
-        stratum0 = self._stratum.is_stratum0()
-        kwargs = {}
-        kwargs['stratum_type']  = 'stratum0' if stratum0 else 'stratum1'
-        kwargs['stratum_alias'] = self._stratum.alias
-        kwargs['fqrn']          = self.fqrn
-        return kwargs
+        return { 'stratum_level' : self._stratum.level,
+                 'stratum_alias' : self._stratum.alias,
+                 'fqrn'          : self.fqrn }
 
 
 class EndpointResource(Resource):
@@ -81,7 +78,7 @@ class EndpointResource(Resource):
 
     def prepend_urls(self):
         return [
-            url(r"^(?P<resource_name>%s)/(?P<stratum_type>[\w\d_.-]+)/(?P<fqrn>[\w\d_.-]+)/(?P<stratum_alias>[\w\d_.-]+)/$" % self._meta.resource_name, self.wrap_view('dispatch_detail'), name="api_dispatch_detail"),
+            url(r"^(?P<resource_name>%s)/stratum(?P<stratum_level>[\d]+)/(?P<stratum_alias>[\w\d_.-]+)/(?P<fqrn>[\w\d_.-]+)/$" % self._meta.resource_name, self.wrap_view('dispatch_detail'), name="api_dispatch_detail"),
         ]
 
     def detail_uri_kwargs(self, bundle_or_obj):
@@ -89,19 +86,16 @@ class EndpointResource(Resource):
         obj = bundle_or_obj.obj if is_bundle else bundle_or_obj
         return obj.make_endpoint_id()
 
-    def __get_stratum_class(self, stratum_type):
-        self.__check_stratum_type(stratum_type)
-        if stratum_type == 'stratum0':
-            return Stratum0
-        elif stratum_type == 'stratum1':
-            return Stratum1
-        else:
-            msg = "unknown stratum type " + stratum_type
+    def __check_stratum_level(self, stratum_level):
+        if stratum_level not in [ 0 , 1 ]:
+            msg = "unknown stratum level %d" % stratum_level
             raise ImmediateHttpResponse(response=http.HttpBadRequest(msg))
 
     def obj_get(self, bundle, **kwargs):
-        stratum_class = self.__get_stratum_class(kwargs['stratum_type'])
-        stratum = stratum_class.objects.get(alias=kwargs['stratum_alias'])
+        stratum_level = int(kwargs['stratum_level'])
+        self.__check_stratum_level(stratum_level)
+        stratum = Stratum.objects.get(alias=kwargs['stratum_alias'],
+                                      level=stratum_level)
         return Endpoint(stratum=stratum, fqrn=kwargs['fqrn'])
 
     def obj_get_list(self, bundle, **kwargs):

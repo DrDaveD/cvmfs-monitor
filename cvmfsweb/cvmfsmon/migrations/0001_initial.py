@@ -8,22 +8,18 @@ from django.db import models
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        # Adding model 'Stratum0'
-        db.create_table('cvmfsmon_stratum0', (
+        # Adding model 'Stratum'
+        db.create_table('cvmfsmon_stratum', (
             ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
             ('name', self.gf('django.db.models.fields.CharField')(max_length=100)),
             ('url', self.gf('django.db.models.fields.URLField')(max_length=200)),
+            ('alias', self.gf('django.db.models.fields.CharField')(max_length=20)),
+            ('level', self.gf('django.db.models.fields.IntegerField')()),
         ))
-        db.send_create_signal('cvmfsmon', ['Stratum0'])
+        db.send_create_signal('cvmfsmon', ['Stratum'])
 
-        # Adding model 'Stratum1'
-        db.create_table('cvmfsmon_stratum1', (
-            ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('name', self.gf('django.db.models.fields.CharField')(max_length=100)),
-            ('url', self.gf('django.db.models.fields.URLField')(max_length=200)),
-            ('alias', self.gf('django.db.models.fields.CharField')(unique=True, max_length=20)),
-        ))
-        db.send_create_signal('cvmfsmon', ['Stratum1'])
+        # Adding unique constraint on 'Stratum', fields ['alias', 'level']
+        db.create_unique('cvmfsmon_stratum', ['alias', 'level'])
 
         # Adding model 'Repository'
         db.create_table('cvmfsmon_repository', (
@@ -32,7 +28,7 @@ class Migration(SchemaMigration):
             ('fqrn', self.gf('django.db.models.fields.CharField')(max_length=100)),
             ('project_url', self.gf('django.db.models.fields.URLField')(max_length=255, blank=True)),
             ('project_description', self.gf('django.db.models.fields.TextField')(blank=True)),
-            ('stratum0', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['cvmfsmon.Stratum0'])),
+            ('stratum0', self.gf('django.db.models.fields.related.ForeignKey')(related_name='stratum0', to=orm['cvmfsmon.Stratum'])),
         ))
         db.send_create_signal('cvmfsmon', ['Repository'])
 
@@ -41,17 +37,17 @@ class Migration(SchemaMigration):
         db.create_table(m2m_table_name, (
             ('id', models.AutoField(verbose_name='ID', primary_key=True, auto_created=True)),
             ('repository', models.ForeignKey(orm['cvmfsmon.repository'], null=False)),
-            ('stratum1', models.ForeignKey(orm['cvmfsmon.stratum1'], null=False))
+            ('stratum', models.ForeignKey(orm['cvmfsmon.stratum'], null=False))
         ))
-        db.create_unique(m2m_table_name, ['repository_id', 'stratum1_id'])
+        db.create_unique(m2m_table_name, ['repository_id', 'stratum_id'])
 
 
     def backwards(self, orm):
-        # Deleting model 'Stratum0'
-        db.delete_table('cvmfsmon_stratum0')
+        # Removing unique constraint on 'Stratum', fields ['alias', 'level']
+        db.delete_unique('cvmfsmon_stratum', ['alias', 'level'])
 
-        # Deleting model 'Stratum1'
-        db.delete_table('cvmfsmon_stratum1')
+        # Deleting model 'Stratum'
+        db.delete_table('cvmfsmon_stratum')
 
         # Deleting model 'Repository'
         db.delete_table('cvmfsmon_repository')
@@ -68,19 +64,14 @@ class Migration(SchemaMigration):
             'name': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
             'project_description': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
             'project_url': ('django.db.models.fields.URLField', [], {'max_length': '255', 'blank': 'True'}),
-            'stratum0': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['cvmfsmon.Stratum0']"}),
-            'stratum1s': ('django.db.models.fields.related.ManyToManyField', [], {'to': "orm['cvmfsmon.Stratum1']", 'symmetrical': 'False'})
+            'stratum0': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'stratum0'", 'to': "orm['cvmfsmon.Stratum']"}),
+            'stratum1s': ('django.db.models.fields.related.ManyToManyField', [], {'related_name': "'stratum1s'", 'symmetrical': 'False', 'to': "orm['cvmfsmon.Stratum']"})
         },
-        'cvmfsmon.stratum0': {
-            'Meta': {'object_name': 'Stratum0'},
+        'cvmfsmon.stratum': {
+            'Meta': {'unique_together': "(('alias', 'level'),)", 'object_name': 'Stratum'},
+            'alias': ('django.db.models.fields.CharField', [], {'max_length': '20'}),
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'name': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
-            'url': ('django.db.models.fields.URLField', [], {'max_length': '200'})
-        },
-        'cvmfsmon.stratum1': {
-            'Meta': {'object_name': 'Stratum1'},
-            'alias': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '20'}),
-            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'level': ('django.db.models.fields.IntegerField', [], {}),
             'name': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
             'url': ('django.db.models.fields.URLField', [], {'max_length': '200'})
         }
