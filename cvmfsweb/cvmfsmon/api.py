@@ -89,9 +89,18 @@ class EndpointResource(Resource):
         obj = bundle_or_obj.obj if is_bundle else bundle_or_obj
         return obj.make_endpoint_id()
 
+    def __get_stratum_class(self, stratum_type):
+        self.__check_stratum_type(stratum_type)
+        if stratum_type == 'stratum0':
+            return Stratum0
+        elif stratum_type == 'stratum1':
+            return Stratum1
+        else:
+            msg = "unknown stratum type " + stratum_type
+            raise ImmediateHttpResponse(response=http.HttpBadRequest(msg))
+
     def obj_get(self, bundle, **kwargs):
-        stratum_class = Stratum0 if   kwargs['stratum_type'] == 'stratum0' \
-                                 else Stratum1
+        stratum_class = self.__get_stratum_class(kwargs['stratum_type'])
         stratum = stratum_class.objects.get(alias=kwargs['stratum_alias'])
         return Endpoint(stratum=stratum, fqrn=kwargs['fqrn'])
 
