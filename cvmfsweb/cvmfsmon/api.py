@@ -52,39 +52,31 @@ class RepositoryResource(ModelResource):
         ]
 
 
-class Endpoint(object):
-    def __init__(self, stratum=None, fqrn=None):
-        self.endpoint = ""
-        if stratum and fqrn:
-            self.fqrn     = fqrn
-            self._stratum = stratum
-            self.endpoint = stratum.make_endpoint(fqrn)
-
-    def make_endpoint_id(self):
-        return { 'stratum_level' : self._stratum.level,
-                 'stratum_alias' : self._stratum.alias,
-                 'fqrn'          : self.fqrn }
-
-
-class EndpointResource(Resource):
-    fqrn     = fields.CharField(attribute='fqrn')
-    endpoint = fields.CharField(attribute='endpoint')
-
+class EndpointResource(ModelResource):
     class Meta:
         resource_name   = 'endpoint'
-        detail_uri_name = 'endpoint_def'
-        object_class    = Endpoint
+        detail_uri_name = 'fqrn'
+        queryset        = Stratum.objects.all()
         allowed_methods = [ 'get' ]
+        fields          = [ 'endpoint' , 'fqrn' ]
 
     def prepend_urls(self):
         return [
-            url(r"^(?P<resource_name>%s)/stratum(?P<stratum_level>[\d]+)/(?P<stratum_alias>[\w\d_.-]+)/(?P<fqrn>[\w\d_.-]+)/$" % self._meta.resource_name, self.wrap_view('dispatch_detail'), name="api_dispatch_detail"),
+            url(r"^(?P<resource_name>%s)/stratum(?P<level>[\d]+)/(?P<alias>[\w\d_.-]+)/(?P<fqrn>[\w\d_.-]+)/$" % self._meta.resource_name, self.wrap_view('dispatch_detail'), name="api_dispatch_detail"),
         ]
 
-    def detail_uri_kwargs(self, bundle_or_obj):
+    def dehydrate(self, bundle):
+        bundle.data['fqrn']     = bundle.obj.fqrn
+        bundle.data['endpoint'] = bundle.obj.make_endpoint(bundle.obj.fqrn)
+        return bundle
+
+    def resource_uri_kwargs(self, bundle_or_obj=None):
+        kwargs = super(EndpointResource, self).resource_uri_kwargs(bundle_or_obj)
         is_bundle = isinstance(bundle_or_obj, Bundle)
-        obj = bundle_or_obj.obj if is_bundle else bundle_or_obj
-        return obj.make_endpoint_id()
+        obj = bundle_or_obj if not is_bundle else bundle_or_obj.obj
+        kwargs['alias'] = obj.alias
+        kwargs['level'] = obj.level
+        return kwargs
 
     def __check_stratum_level(self, stratum_level):
         if stratum_level not in [ 0 , 1 ]:
@@ -92,14 +84,11 @@ class EndpointResource(Resource):
             raise ImmediateHttpResponse(response=http.HttpBadRequest(msg))
 
     def obj_get(self, bundle, **kwargs):
-        stratum_level = int(kwargs['stratum_level'])
-        self.__check_stratum_level(stratum_level)
-        stratum = Stratum.objects.get(alias=kwargs['stratum_alias'],
-                                      level=stratum_level)
-        return Endpoint(stratum=stratum, fqrn=kwargs['fqrn'])
+        fqrn = kwargs['fqrn']
+        del kwargs['fqrn']
+        stratum = super(EndpointResource, self).obj_get(bundle, **kwargs)
+        stratum.fqrn = fqrn
+        return stratum
 
     def obj_get_list(self, bundle, **kwargs):
         raise ImmediateHttpResponse(response=http.HttpBadRequest())
-
-    def rollback(self, bundles):
-        pass
