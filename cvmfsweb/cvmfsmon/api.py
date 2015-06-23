@@ -33,9 +33,32 @@ class EndpointResource(ModelResource):
         allowed_methods = [ 'get' ]
         fields          = [ 'endpoint' ]
 
+    def dispatch_status_detail(self, request, **kwargs):
+        request.repo_status = True
+        return self.dispatch_detail(request, **kwargs)
+
+    def dispatch_bare_detail(self, request, **kwargs):
+        request.repo_status = False
+        return self.dispatch_detail(request, **kwargs)
+
+    def get_resource_uri(self, bundle_or_obj=None, url_name='api_dispatch_list'):
+        if isinstance(bundle_or_obj, Bundle) and \
+            bundle_or_obj.request.repo_status:
+            url_name = 'api_dispatch_status_detail'
+            try:
+                return self._build_reverse_url(
+                                url_name,
+                                kwargs=self.resource_uri_kwargs(bundle_or_obj))
+            except NoReverseMatch:
+                return ''
+        else:
+            return super(EndpointResource, self).get_resource_uri(bundle_or_obj,
+                                                                  url_name)
+
     def prepend_urls(self):
         return [
-            url(r"^(?P<resource_name>%s)/stratum(?P<level>[\d]+)/(?P<alias>[\w\d_.-]+)/(?P<fqrn>[\w\d_.-]+)/$" % self._meta.resource_name, self.wrap_view('dispatch_detail'), name="api_dispatch_detail"),
+            url(r"^(?P<resource_name>%s)/stratum(?P<level>[\d]+)/(?P<alias>[\w\d_.-]+)/(?P<fqrn>[\w\d_.-]+)/$" % self._meta.resource_name, self.wrap_view('dispatch_bare_detail'), name="api_dispatch_detail"),
+            url(r"^(?P<resource_name>%s)/stratum(?P<level>[\d]+)/(?P<alias>[\w\d_.-]+)/(?P<fqrn>[\w\d_.-]+)/status/$" % self._meta.resource_name, self.wrap_view('dispatch_status_detail'), name="api_dispatch_status_detail"),
         ]
 
     def _dehydrate_optional_field(self, bundle, field_name):
@@ -60,11 +83,19 @@ class EndpointResource(ModelResource):
         kwargs['level'] = obj.level
         return kwargs
 
+    def _retrieve_stratum1_status(self, bundle, stratum):
+        stratum_connection = stratum.connect_to(stratum.fqrn)
+        stratum.revision   = stratum_connection.manifest.revision
+        if bundle.obj.level > 0:
+            stratum.last_replication = stratum_connection.last_replication
+
     def obj_get(self, bundle, **kwargs):
         fqrn = kwargs['fqrn']
         del kwargs['fqrn']
         stratum = super(EndpointResource, self).obj_get(bundle, **kwargs)
         stratum.fqrn = fqrn
+        if bundle.request.repo_status:
+            self._retrieve_stratum1_status(bundle, stratum)
         return stratum
 
     def obj_get_list(self, bundle, **kwargs):
