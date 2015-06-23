@@ -117,6 +117,20 @@ class RepositoryResource(ModelResource):
         request.repo_status = False
         return self.dispatch_detail(request, **kwargs)
 
+    def get_resource_uri(self, bundle_or_obj=None, url_name='api_dispatch_list'):
+        if isinstance(bundle_or_obj, Bundle) and \
+            bundle_or_obj.request.repo_status:
+            url_name = 'api_dispatch_status_detail'
+            try:
+                return self._build_reverse_url(
+                                url_name,
+                                kwargs=self.resource_uri_kwargs(bundle_or_obj))
+            except NoReverseMatch:
+                return ''
+        else:
+            return super(RepositoryResource, self).get_resource_uri(bundle_or_obj,
+                                                                    url_name)
+
     def prepend_urls(self):
         return [
             url(r"^(?P<resource_name>%s)/(?P<fqrn>[\w\d_.-]+)/$" % self._meta.resource_name, self.wrap_view('dispatch_bare_detail'), name="api_dispatch_detail"),
