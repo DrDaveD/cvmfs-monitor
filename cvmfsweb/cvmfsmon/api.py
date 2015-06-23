@@ -42,13 +42,70 @@ class StratumResource(ModelResource):
         ]
 
 
-class EndpointResource(ModelResource):
+
+
+class Endpoint:
+    def __init__(self, stratum = None, fqrn = '', status = False):
+        if stratum:
+            self.stratum  = stratum
+            self.fqrn     = fqrn
+            self.endpoint = stratum.make_endpoint(fqrn)
+        if status:
+            self._retrieve_status()
+
+    def connect(self):
+        if not hasattr(self, '_connection'):
+            self._connection = self.stratum.connect_to(self.fqrn)
+        return self._connection
+
+    def _retrieve_status(self):
+        connection = self.connect()
+        self.revision = connection.manifest.revision
+        self.last_replication = None
+        if self.stratum.level > 0:
+            self.last_replication = connection.last_replication
+        self.last_modified = connection.manifest.last_modified
+
+
+class EndpointResource(Resource):
+    stratum          = fields.ForeignKey(StratumResource, attribute=lambda bundle: bundle.obj.stratum)
+    fqrn             = fields.CharField(attribute='fqrn')
+    endpoint         = fields.CharField(attribute='endpoint')
+    revision         = fields.IntegerField(attribute='revision', null=True)
+    last_modified    = fields.DateTimeField(attribute='last_modified', null=True)
+    last_replication = fields.DateTimeField(attribute='last_replication', null=True)
+
     class Meta:
         resource_name   = 'endpoint'
         detail_uri_name = 'fqrn'
-        queryset        = Stratum.objects.all()
-        allowed_methods = [ 'get' ]
-        fields          = [ 'endpoint' ]
+        object_class    = Endpoint
+
+    def dehydrate(self, bundle):
+        data = bundle.data
+        if not bundle.request.repo_status:
+            del data['revision']
+            del data['last_modified']
+            del data['last_replication']
+        return bundle
+
+    def obj_get(self, bundle, **kwargs):
+        stratum_alias = kwargs['alias']
+        stratum_level = kwargs['level']
+        fqrn          = kwargs['fqrn']
+        status        = bundle.request.repo_status
+        stratum = Stratum.objects.filter(alias=stratum_alias,
+                                         level=stratum_level).get()
+        return Endpoint(stratum, fqrn, status)
+
+    def detail_uri_kwargs(self, bundle_or_obj):
+        is_bundle = isinstance(bundle_or_obj, Bundle)
+        endpoint  = bundle_or_obj if not is_bundle else bundle_or_obj.obj
+        kwargs = {
+            'level' : endpoint.stratum.level,
+            'alias' : endpoint.stratum.alias,
+            'fqrn'  : endpoint.fqrn,
+        }
+        return kwargs
 
     def dispatch_status_detail(self, request, **kwargs):
         request.repo_status = True
@@ -60,7 +117,7 @@ class EndpointResource(ModelResource):
 
     def get_resource_uri(self, bundle_or_obj=None, url_name='api_dispatch_list'):
         if isinstance(bundle_or_obj, Bundle) and \
-            bundle_or_obj.request.repo_status:
+           bundle_or_obj.request.repo_status:
             url_name = 'api_dispatch_status_detail'
             try:
                 return self._build_reverse_url(
@@ -78,45 +135,6 @@ class EndpointResource(ModelResource):
             url(r"^(?P<resource_name>%s)/stratum(?P<level>[\d]+)/(?P<alias>[\w\d_.-]+)/(?P<fqrn>[\w\d_.-]+)/status/$" % self._meta.resource_name, self.wrap_view('dispatch_status_detail'), name="api_dispatch_status_detail"),
         ]
 
-    def _dehydrate_optional_field(self, bundle, field_name):
-        obj = bundle.obj
-        if hasattr(obj, field_name):
-            bundle.data[field_name] = getattr(obj, field_name)
-
-
-    def dehydrate(self, bundle):
-        obj = bundle.obj
-        bundle.data['endpoint'] = obj.make_endpoint(bundle.obj.fqrn)
-        self._dehydrate_optional_field(bundle, 'revision')
-        self._dehydrate_optional_field(bundle, 'last_replication')
-        self._dehydrate_optional_field(bundle, 'health')
-        return bundle
-
-    def resource_uri_kwargs(self, bundle_or_obj=None):
-        kwargs = super(EndpointResource, self).resource_uri_kwargs(bundle_or_obj)
-        is_bundle = isinstance(bundle_or_obj, Bundle)
-        obj = bundle_or_obj if not is_bundle else bundle_or_obj.obj
-        kwargs['alias'] = obj.alias
-        kwargs['level'] = obj.level
-        return kwargs
-
-    def _retrieve_stratum1_status(self, bundle, stratum):
-        stratum_connection = stratum.connect_to(stratum.fqrn)
-        stratum.revision   = stratum_connection.manifest.revision
-        if bundle.obj.level > 0:
-            stratum.last_replication = stratum_connection.last_replication
-
-    def obj_get(self, bundle, **kwargs):
-        fqrn = kwargs['fqrn']
-        del kwargs['fqrn']
-        stratum = super(EndpointResource, self).obj_get(bundle, **kwargs)
-        stratum.fqrn = fqrn
-        if bundle.request.repo_status:
-            self._retrieve_stratum1_status(bundle, stratum)
-        return stratum
-
-    def obj_get_list(self, bundle, **kwargs):
-        raise ImmediateHttpResponse(response=http.HttpBadRequest())
 
 
 class RepositoryResource(ModelResource):
