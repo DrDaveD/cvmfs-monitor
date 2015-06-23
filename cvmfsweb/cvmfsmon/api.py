@@ -138,7 +138,8 @@ class EndpointResource(Resource):
 
 
 class RepositoryResource(ModelResource):
-    endpoints = fields.ManyToManyField(EndpointResource, attribute=lambda bundle: RepositoryResource._wrap_endpoints(bundle), null=True, full=True)
+    stratum1_endpoints = fields.ManyToManyField(EndpointResource, attribute=lambda bundle: RepositoryResource._get_stratum1_endpoints(bundle), null=True, full=True)
+    stratum0_endpoint  = fields.ForeignKey(EndpointResource, attribute=lambda bundle:RepositoryResource._get_stratum0_endpoint(bundle), full=False)
 
     class Wrapper:
         def __init__(self, list):
@@ -147,26 +148,19 @@ class RepositoryResource(ModelResource):
             return self.list
 
     @staticmethod
-    def _wrap_endpoints(bundle):
-        stratums = []
-        for s in Stratum.objects.filter(level=1):
-            s.fqrn = bundle.obj.fqrn
-            stratums.append(s)
-
-        if bundle.request.repo_status:
-            RepositoryResource._append_stratum1_status(bundle.obj, stratums)
-
-        return RepositoryResource.Wrapper(stratums)
+    def _get_stratum1_endpoints(bundle):
+        fqrn      = bundle.obj.fqrn
+        status    = bundle.request.repo_status
+        stratum1s = bundle.obj.stratum1s.all()
+        endpoints = [ Endpoint(s1, fqrn, status) for s1 in stratum1s ]
+        return RepositoryResource.Wrapper(endpoints)
 
     @staticmethod
-    def _append_stratum1_status(repo, stratum1s):
-        stratum0 = repo.stratum0.connect_to(repo.fqrn)
-        avail = Availability(stratum0)
-        for s1 in stratum1s:
-            s1repo              = s1.connect_to(repo.fqrn)
-            s1.revision         = s1repo.manifest.revision
-            s1.last_replication = s1repo.last_replication
-            s1.health           = avail.get_stratum1_health_score(s1repo)
+    def _get_stratum0_endpoint(bundle):
+        fqrn      = bundle.obj.fqrn
+        status    = bundle.request.repo_status
+        stratum0  = bundle.obj.stratum0
+        return Endpoint(stratum0, fqrn, status)
 
     class Meta:
         resource_name   = 'repository'
@@ -174,6 +168,31 @@ class RepositoryResource(ModelResource):
         queryset        = Repository.objects.all()
         allowed_methods = [ 'get' ]
         excludes        = [ 'id' ]
+
+    def _dehydrate_redundant_fields(self, bundle):
+        for s1_endpoint in bundle.data['stratum1_endpoints']:
+            del s1_endpoint.data['fqrn']
+
+    def _dehydrate_repo_status(self, bundle):
+        s0_connection  = self.stratum0_endpoint.fk_resource.instance.connect()
+        avail = Availability(s0_connection)
+        for s1_endpoint_bundle in bundle.data['stratum1_endpoints']:
+            s1_connection = s1_endpoint_bundle.obj.connect()
+            avail.add_stratum1(s1_connection)
+            health = avail.get_stratum1_health_score(s1_connection)
+            s1_endpoint_bundle.data['health'] = health
+
+        bundle.data['health'] = avail.get_repository_health_score()
+
+
+    def dehydrate(self, bundle):
+        self._dehydrate_redundant_fields(bundle)
+        if bundle.request.repo_status:
+            self._dehydrate_repo_status(bundle)
+        return bundle
+
+    def obj_get(self, bundle, **kwargs):
+        return super(RepositoryResource, self).obj_get(bundle, **kwargs)
 
     def dispatch_status_detail(self, request, **kwargs):
         request.repo_status = True
@@ -184,8 +203,9 @@ class RepositoryResource(ModelResource):
         return self.dispatch_detail(request, **kwargs)
 
     def get_resource_uri(self, bundle_or_obj=None, url_name='api_dispatch_list'):
-        if isinstance(bundle_or_obj, Bundle) and \
-            bundle_or_obj.request.repo_status:
+        if isinstance(bundle_or_obj, Bundle)             and \
+           hasattr(bundle_or_obj.request, 'repo_status') and \
+           bundle_or_obj.request.repo_status:
             url_name = 'api_dispatch_status_detail'
             try:
                 return self._build_reverse_url(
