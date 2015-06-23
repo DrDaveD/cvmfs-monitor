@@ -3,8 +3,10 @@ from tastypie.resources  import Resource, ModelResource
 from tastypie            import fields, http
 from tastypie.bundle     import Bundle
 from tastypie.exceptions import ImmediateHttpResponse
-from cvmfsmon.models     import Stratum, Repository
 from tastypie.utils      import trailing_slash
+
+from cvmfsmon.models     import Stratum, Repository
+from cvmfs               import Availability
 
 
 class Stratum1Resource(ModelResource):
@@ -74,7 +76,21 @@ class RepositoryResource(ModelResource):
         for s in Stratum.objects.filter(level=1):
             s.fqrn = bundle.obj.fqrn
             stratums.append(s)
+
+        if bundle.request.repo_status:
+            RepositoryResource._append_stratum1_status(bundle.obj, stratums)
+
         return RepositoryResource.Wrapper(stratums)
+
+    @staticmethod
+    def _append_stratum1_status(repo, stratum1s):
+        stratum0 = repo.stratum0.connect_to(repo.fqrn)
+        avail = Availability(stratum0)
+        for s1 in stratum1s:
+            s1repo              = s1.connect_to(repo.fqrn)
+            s1.revision         = s1repo.manifest.revision
+            s1.last_replication = s1repo.last_replication
+            s1.health           = avail.get_stratum1_health_score(s1repo)
 
     class Meta:
         resource_name   = 'repository'
@@ -83,7 +99,16 @@ class RepositoryResource(ModelResource):
         allowed_methods = [ 'get' ]
         excludes        = [ 'id' ]
 
+    def dispatch_status_detail(self, request, **kwargs):
+        request.repo_status = True
+        return self.dispatch_detail(request, **kwargs)
+
+    def dispatch_bare_detail(self, request, **kwargs):
+        request.repo_status = False
+        return self.dispatch_detail(request, **kwargs)
+
     def prepend_urls(self):
         return [
-            url(r"^(?P<resource_name>%s)/(?P<fqrn>[\w\d_.-]+)/$" % self._meta.resource_name, self.wrap_view('dispatch_detail'), name="api_dispatch_detail"),
+            url(r"^(?P<resource_name>%s)/(?P<fqrn>[\w\d_.-]+)/$" % self._meta.resource_name, self.wrap_view('dispatch_bare_detail'), name="api_dispatch_detail"),
+            url(r"^(?P<resource_name>%s)/(?P<fqrn>[\w\d_.-]+)/status/$" % self._meta.resource_name, self.wrap_view('dispatch_status_detail'), name="api_dispatch_status_detail"),
         ]
