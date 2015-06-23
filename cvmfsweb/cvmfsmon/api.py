@@ -38,8 +38,18 @@ class EndpointResource(ModelResource):
             url(r"^(?P<resource_name>%s)/stratum(?P<level>[\d]+)/(?P<alias>[\w\d_.-]+)/(?P<fqrn>[\w\d_.-]+)/$" % self._meta.resource_name, self.wrap_view('dispatch_detail'), name="api_dispatch_detail"),
         ]
 
+    def _dehydrate_optional_field(self, bundle, field_name):
+        obj = bundle.obj
+        if hasattr(obj, field_name):
+            bundle.data[field_name] = getattr(obj, field_name)
+
+
     def dehydrate(self, bundle):
-        bundle.data['endpoint'] = bundle.obj.make_endpoint(bundle.obj.fqrn)
+        obj = bundle.obj
+        bundle.data['endpoint'] = obj.make_endpoint(bundle.obj.fqrn)
+        self._dehydrate_optional_field(bundle, 'revision')
+        self._dehydrate_optional_field(bundle, 'last_replication')
+        self._dehydrate_optional_field(bundle, 'health')
         return bundle
 
     def resource_uri_kwargs(self, bundle_or_obj=None):
