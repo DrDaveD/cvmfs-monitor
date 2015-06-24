@@ -4,7 +4,7 @@
 
 * Checkout the main [CVMFS Git repository](https://github.com/cvmfs/cvmfs)
 * Install the python-cvmfsutils package
-* `cd cvmfs/python && sudo python setup.py install`
+	* `cd cvmfs/python && sudo python setup.py install`
 	* setup.py installs dependencies automatically
 	* for the reference RPM dependencies are:
 		* python-dateutil
